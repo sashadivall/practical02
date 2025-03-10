@@ -64,7 +64,9 @@ More details on deliverables will be shared soon.
 
 
 ### Areas for Evaluation:
-Robustness of Experimentation (30%)
-Analysis of collected data (30%)
-Recommendation of pipeline organizations (20%)
-Professionalism of Slide Deck (20%)
+- Robustness of Experimentation (30%)
+- Analysis of collected data (30%)
+- Recommendation of pipeline organizations (20%)
+- Professionalism of Slide Deck (20%)
+
+Add a cheat sheet as one of the documents
