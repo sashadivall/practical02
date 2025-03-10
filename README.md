@@ -1,3 +1,8 @@
+Docs to Add:
+ - Professor questions from class
+ - Written description on how to build B+ / AVL Trees
+ - 
+
 # Practical 2: VectorDBs and LLMs
 DS4300 Spring 2025 Practical 2
 Due: 
