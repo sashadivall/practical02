@@ -12,7 +12,8 @@ DOC_PREFIX = "doc:"
 DISTANCE_METRIC = "cosine"
 
 class ChromaRag:
-    def __init__(self, embedding_type: str, embedding_model: str, chunk_size: int, chunk_overlap: int, llm: str, data_dir: str, topK: int = 3, instruction: str = None):
+    def __init__(self, embedding_type: str, embedding_model: str, chunk_size: int, chunk_overlap: int, 
+                 llm: str, data_dir: str, topK: int = 3, instruction: str = None):
         self.client = chromadb.PersistentClient(path="./chroma_db")
         self.embedding_type = embedding_type
         self.embedding_model = embedding_model
