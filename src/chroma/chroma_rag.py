@@ -6,10 +6,7 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
-from src.utils import extract_text_from_pdf, split_text_into_chunks
-INDEX_NAME = "embedding_index"
-DOC_PREFIX = "doc:"
-DISTANCE_METRIC = "cosine"
+from src.utils import extract_text_from_pdf, split_text_into_chunks, get_embedding, INDEX_NAME, DISTANCE_METRIC, DOC_PREFIX
 
 class ChromaRag:
     def __init__(self, embedding_type: str, embedding_model: str, chunk_size: int, chunk_overlap: int, 
@@ -41,19 +38,6 @@ class ChromaRag:
             pass
         return collection
 
-    def _get_embedding(self, text: str) -> list:
-        if self.embedding_type == "ollama":
-            response = ollama.embeddings(model=self.embedding_model, prompt=text)
-            response = response["embedding"]
-        elif self.embedding_type == "sentence_transformer":
-            if (self.instruction):
-                text = (self.instruction, text)
-            response = self.embedding_model.encode(text)
-        else:
-            raise ValueError(f"embedding_type must be either 'ollama' or 'sentence_transformer'. Current embedding_type: {self.embedding_type}")
-        if (self.instruction):
-            response = response[0].tolist()
-        return response
         
     def _store_embedding(self, file: str, page: str, chunk: str, embedding: list):
         """Stores embeddings in ChromaDB"""
@@ -79,7 +63,7 @@ class ChromaRag:
                     # print(f"  Chunks: {chunks}")
                     for chunk_index, chunk in enumerate(chunks):
                         # embedding = calculate_embedding(chunk)
-                        embedding = self._get_embedding(chunk)
+                        embedding = get_embedding(self.embedding_type, self.embedding_model, chunk, self.instruction)
                         self._store_embedding(
                             file=file_name,
                             page=str(page_num),
@@ -90,7 +74,7 @@ class ChromaRag:
 
 
     def _search_embeddings(self, query, top_k=3):
-        query_embedding = self._get_embedding(query)
+        query_embedding = get_embedding(self.embedding_type, self.embedding_model, query, self.instruction)
 
         try:
             results = self.collection.query(
