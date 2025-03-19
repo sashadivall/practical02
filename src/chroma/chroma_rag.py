@@ -6,13 +6,12 @@ import numpy as np
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 from src.utils import extract_text_from_pdf, split_text_into_chunks
-VECTOR_DIM = 768
 INDEX_NAME = "embedding_index"
 DOC_PREFIX = "doc:"
 DISTANCE_METRIC = "cosine"
 
 class ChromaRag:
-    def __init__(self, embedding_model: str, chunk_size: int, chunk_overlap: int, llm: str, data_dir: str, topK: int = 3):
+    def __init__(self, embedding_model: str, chunk_size: int, chunk_overlap: int, llm: str, data_dir: str, topK: int = 3, clear_store: bool = False):
         self.client = chromadb.PersistentClient(path="./chroma_db")
         self.embedding_model = embedding_model
         self.chunk_size = chunk_size
@@ -20,7 +19,6 @@ class ChromaRag:
         self.llm = llm
         self.data_dir = data_dir
         self.topK = topK
-        self._clear_chroma_store()
         self.collection = self.create_hnsw_index()
 
 
@@ -135,6 +133,14 @@ class ChromaRag:
         )
 
         return response["message"]["content"]
+    
+    def static_search(self, query):
+        context_results = self._search_embeddings(query)
+
+        # Generate RAG response
+        response = self._generate_rag_response(query, context_results)
+        return response
+
 
 
     def interactive_search(self):
@@ -159,15 +165,3 @@ class ChromaRag:
 
     def ingest(self):
         self._process_pdfs()
-
-        
-
-def main():
-    chroma = ChromaRag("nomic-embed-text", chunk_size=300, chunk_overlap=100, llm="llama3.2:latest", data_dir="data")
-    chroma.ingest()
-    print("Ingestion Done")
-
-    chroma.interactive_search()
-
-if __name__ == "__main__":
-    main()
