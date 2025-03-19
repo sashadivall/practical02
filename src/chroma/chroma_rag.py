@@ -157,19 +157,6 @@ class ChromaRag:
             print("\n--- Response ---")
             print(response)
 
-    # def _query_chroma(self, query_text: str, top_k=5):
-    #     """Search ChromaDB for the most similar embeddings."""
-    #     embedding = self._get_embedding(query_text)
-
-    #     results = self.collection.query(
-    #         query_embeddings=[embedding], 
-    #         n_results=top_k
-    #     )
-    #     for i, (doc_id, metadata, distance) in enumerate(
-    #         zip(results["ids"][0], results["metadatas"][0], results["distances"][0])
-    #     ):
-    #         print(f"{doc_id} \n ----> {distance:.4f}")
-
     def ingest(self):
         self._process_pdfs()
 
