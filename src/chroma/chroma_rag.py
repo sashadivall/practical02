@@ -3,6 +3,7 @@ import ollama
 import sys
 import os
 import numpy as np
+from sentence_transformers import SentenceTransformer
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 from src.utils import extract_text_from_pdf, split_text_into_chunks
@@ -11,14 +12,17 @@ DOC_PREFIX = "doc:"
 DISTANCE_METRIC = "cosine"
 
 class ChromaRag:
-    def __init__(self, embedding_model: str, chunk_size: int, chunk_overlap: int, llm: str, data_dir: str, topK: int = 3, clear_store: bool = False):
+    def __init__(self, embedding_type: str, embedding_model: str, chunk_size: int, chunk_overlap: int, llm: str, data_dir: str, topK: int = 3, instruction: str = None):
         self.client = chromadb.PersistentClient(path="./chroma_db")
+        self.embedding_type = embedding_type
         self.embedding_model = embedding_model
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.llm = llm
         self.data_dir = data_dir
         self.topK = topK
+        self.instruction = instruction
+        self._clear_chroma_store()
         self.collection = self.create_hnsw_index()
 
 
@@ -37,9 +41,19 @@ class ChromaRag:
         return collection
 
     def _get_embedding(self, text: str) -> list:
-        response = ollama.embeddings(model=self.embedding_model, prompt=text)
-        return response["embedding"]
-
+        if self.embedding_type == "ollama":
+            response = ollama.embeddings(model=self.embedding_model, prompt=text)
+            response = response["embedding"]
+        elif self.embedding_type == "sentence_transformer":
+            if (self.instruction):
+                text = (self.instruction, text)
+            response = self.embedding_model.encode(text)
+        else:
+            raise ValueError(f"embedding_type must be either 'ollama' or 'sentence_transformer'. Current embedding_type: {self.embedding_type}")
+        if (self.instruction):
+            response = response[0].tolist()
+        return response
+        
     def _store_embedding(self, file: str, page: str, chunk: str, embedding: list):
         """Stores embeddings in ChromaDB"""
         key = f"{DOC_PREFIX}:{file}_page_{page}_chunk_{chunk}"
@@ -165,3 +179,37 @@ class ChromaRag:
 
     def ingest(self):
         self._process_pdfs()
+
+
+# Example Usage
+# def main():
+    # nomic-embed-text
+    # chroma_nomic = ChromaRag(embedding_type="ollama", embedding_model="nomic-embed-text", chunk_size=300, chunk_overlap=100, 
+    #                          llm="llama3.2:latest", data_dir="data_small")
+    # chroma_nomic.ingest()
+    # print(chroma_nomic.static_search("What is ACID Compliance"))
+
+    # # all-mpnet-base-v2
+    # model1 = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
+    # chroma_sentence_trans1 = ChromaRag(embedding_type="sentence_transformer", embedding_model=model1, chunk_size=300, chunk_overlap=100, 
+    #                          llm="llama3.2:latest", data_dir="data_small")
+    # chroma_sentence_trans1.ingest()
+    # print(chroma_sentence_trans1.static_search("What is ACID Compliance"))
+
+    # # all-MiniLM-L6-v2
+    # model2 = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+    # chroma_sentence_trans2 = ChromaRag(embedding_type="sentence_transformer", embedding_model=model2, chunk_size=300, chunk_overlap=100, 
+    #                          llm="llama3.2:latest", data_dir="data_small")
+    # chroma_sentence_trans2.ingest()
+    # print(chroma_sentence_trans2.static_search("What is ACID Compliance"))
+
+    # InstructorXL (requires instruction for embedding)
+    # Huge model - will take a ~10 mins to load on your laptop, but once its loaded once it won't load again
+    # model3 = SentenceTransformer('hkunlp/instructor-xl')
+    # chroma_sentence_trans3 = ChromaRag(embedding_type="sentence_transformer", embedding_model=model3, chunk_size=300, chunk_overlap=100, 
+    #                          llm="llama3.2:latest", data_dir="data_small", instruction="Represent this text for retrieval:")
+    # chroma_sentence_trans3.ingest()
+    # print(chroma_sentence_trans3.static_search("What is ACID Compliance"))
+
+# if __name__ == "__main__":
+#     main()
