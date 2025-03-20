@@ -2,10 +2,10 @@ import time
 import psutil
 import csv
 import re
-from chroma_rag import ChromaRag
+from src.chroma.chroma_rag import ChromaRag
+from src.redis.redis_rag import RedisRag
 import os
 from sentence_transformers import SentenceTransformer
-import pandas as pd
 
 def preprocess_text(text):
     """Remove extra whitespace, punctuation, and noise."""
@@ -26,7 +26,7 @@ def measure_speed_and_memory(func, *args):
     memory_used = final_memory - initial_memory
     return result, execution_time, memory_used
 
-def run_experiment(embedding_model, chunk_size, chunk_overlap, llm, data_dir, instruction=None):
+def run_experiment(vector_db, embedding_model_name, embedding_model, chunk_size, chunk_overlap, llm, data_dir, query, instruction=None):
     """Run the experiment for different configurations and return the results."""
     # Create an instance of ChromaRag
     chroma_rag = ChromaRag(
@@ -43,11 +43,12 @@ def run_experiment(embedding_model, chunk_size, chunk_overlap, llm, data_dir, in
     _, ingest_time, ingest_memory = measure_speed_and_memory(chroma_rag.ingest)
     
     # Static search test
-    query = "What is ACID Compliance?"
     search_results, search_time, search_memory = measure_speed_and_memory(chroma_rag.static_search, query)
+    compute_proc_type = os.uname().machine
 
     return {
-        'embedding_model': embedding_model,
+        'vector_db': vector_db,
+        'embedding_model': embedding_model_name,
         'chunk_size': chunk_size,
         'chunk_overlap': chunk_overlap,
         'llm': llm,
@@ -55,14 +56,15 @@ def run_experiment(embedding_model, chunk_size, chunk_overlap, llm, data_dir, in
         'ingest_memory': ingest_memory,
         'search_time': search_time,
         'search_memory': search_memory,
+        'compute_proc_type': compute_proc_type,
         'search_results': search_results
     }
 
 def save_results_to_csv(results, filename="experiment_results.csv"):
     """Save the results into a CSV file."""
     fieldnames = [
-        'embedding_model', 'chunk_size', 'chunk_overlap', 'llm', 'ingest_time', 'ingest_memory',
-        'search_time', 'search_memory', 'search_results'
+        'vector_db', 'embedding_model', 'chunk_size', 'chunk_overlap', 'llm', 'ingest_time', 'ingest_memory',
+        'search_time', 'search_memory', 'compute_proc_type', 'search_results'
     ]
     file_exists = os.path.isfile(filename)
 
@@ -77,6 +79,9 @@ def main():
     
     # Define LLMs and embedding models
     embedding_models = [SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')]
+
+    # TODO - change depending on the transformer you use
+    embedding_model_name = 'sentence-transformers/all-MiniLM-L6-v2'
     
     #embedding_models = [
     #    SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2'),
@@ -93,6 +98,10 @@ def main():
     #chunk_overlaps = [0, 50, 100]
     
     all_results = []
+
+    # Sample query
+    # TODO - Replace this with questions from csv dataset
+    query = "What is ACID compliance?"
     
     for embedding_model in embedding_models:
         for llm in llms:
@@ -100,11 +109,15 @@ def main():
                 for chunk_overlap in chunk_overlaps:
                     # Run the experiment
                     result = run_experiment(
+                        # TODO - CHANGE THE VECTOR DB STRING WHEN YOU RUN WITH REDIS/FAISS etc
+                        vector_db = "chroma",
+                        embedding_model_name = embedding_model_name,
                         embedding_model=embedding_model, 
                         chunk_size=chunk_size, 
                         chunk_overlap=chunk_overlap, 
                         llm=llm, 
-                        data_dir=data_dir
+                        data_dir=data_dir,
+                        query=query
                     )
                     all_results.append(result)
     
