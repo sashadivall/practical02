@@ -57,6 +57,7 @@ def run_experiment(vector_db, embedding_model_name, embedding_model, chunk_size,
         'search_time': search_time,
         'search_memory': search_memory,
         'compute_proc_type': compute_proc_type,
+        'query': query,
         'search_results': search_results
     }
 
