@@ -1,0 +1,13 @@
+embedding_model,chunk_size,chunk_overlap,llm,ingest_time,ingest_memory,search_time,search_memory,search_results
+"SentenceTransformer(
+  (0): Transformer({'max_seq_length': 256, 'do_lower_case': False}) with Transformer model: BertModel 
+  (1): Pooling({'word_embedding_dimension': 384, 'pooling_mode_cls_token': False, 'pooling_mode_mean_tokens': True, 'pooling_mode_max_tokens': False, 'pooling_mode_mean_sqrt_len_tokens': False, 'pooling_mode_weightedmean_tokens': False, 'pooling_mode_lasttoken': False, 'include_prompt': True})
+  (2): Normalize()
+)",200,0,llama3.2:latest,24.748525857925415,-128.36328125,23.88993000984192,-60.1328125,"ACID Compliance refers to the adherence to four key principles:
+
+1. Atomicity: A transaction is treated as an atomic unit, meaning it is fully executed or not executed at all.
+2. Consistency: A transaction takes a database from one consistent state to another consistent state, ensuring that all data meets integrity constraints.
+3. Isolation: Two transactions cannot affect each other, even if they are being executed concurrently.
+4. Durability: Once a transaction is completed and committed successfully, its changes are permanent and preserved even in the event of a system failure.
+
+In essence, ACID Compliance ensures that database transactions are reliable, consistent, and free from concurrency issues, providing a robust foundation for data management."
