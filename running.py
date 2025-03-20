@@ -65,7 +65,7 @@ def save_results_to_csv(results, filename="experiment_results.csv"):
     """Save the results into a CSV file."""
     fieldnames = [
         'vector_db', 'embedding_model', 'chunk_size', 'chunk_overlap', 'llm', 'ingest_time', 'ingest_memory',
-        'search_time', 'search_memory', 'compute_proc_type', 'search_results'
+        'search_time', 'search_memory', 'compute_proc_type', 'query', 'search_results'
     ]
     file_exists = os.path.isfile(filename)
 
