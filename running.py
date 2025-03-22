@@ -31,7 +31,7 @@ def measure_speed_and_memory(func, *args):
 def run_experiment(vector_db, embedding_model_name, embedding_model, chunk_size, chunk_overlap, llm, data_dir, questions, instruction=None):
     """Run the experiment for different configurations and return the results."""
     # Create an instance of ChromaRag
-    chroma_rag = ChromaRag(
+    redis_rag = RedisRag(
         embedding_type="sentence_transformer", 
         embedding_model=embedding_model, 
         chunk_size=chunk_size, 
@@ -42,11 +42,11 @@ def run_experiment(vector_db, embedding_model_name, embedding_model, chunk_size,
     )
     
     # Measure the speed and memory usage of the ingest process
-    _, ingest_time, ingest_memory = measure_speed_and_memory(chroma_rag.ingest)
+    _, ingest_time, ingest_memory = measure_speed_and_memory(redis_rag.ingest)
     
     # Static search test
     for query in questions:
-        search_results, search_time, search_memory = measure_speed_and_memory(chroma_rag.static_search, query)
+        search_results, search_time, search_memory = measure_speed_and_memory(redis_rag.static_search, query)
         compute_proc_type = os.uname().machine
 
         results = {
@@ -115,7 +115,7 @@ def main():
                 # Run the experiment
                 run_experiment(
                     # TODO - CHANGE THE VECTOR DB STRING WHEN YOU RUN WITH REDIS/FAISS etc
-                    vector_db = "chroma",
+                    vector_db = "redis",
                     embedding_model_name = embedding_model_name,
                     embedding_model=embedding_model, 
                     chunk_size=chunk_size, 
