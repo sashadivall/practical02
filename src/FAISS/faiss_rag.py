@@ -5,203 +5,168 @@ import os
 import json
 import fitz  # PyMuPDF for PDF extraction
 
-DOC_PREFIX = "doc:"
-DISTANCE_METRIC = "COSINE"
-VECTOR_DIM = 768
-INDEX_FILE = "faiss_index.bin"
-METADATA_FILE = "faiss_metadata.json"
 
-# Initialize FAISS index
-index = faiss.IndexFlatL2(VECTOR_DIM)
+class FaissRAG:
+    def __init__(self, embedding_model: str = "nomic-embed-text", chunk_size: int = 300, chunk_overlap: int = 50, 
+                 llm_model: str = "llama3.2:latest", data_dir: str = "data", topK: int = 3, instruction: str = None):
 
-# Load metadata if it exists
-metadata = {}
-if os.path.exists(METADATA_FILE):
-    with open(METADATA_FILE, "r") as f:
-        metadata = json.load(f)
+        self.embedding_model = embedding_model
+        self.chunk_size = chunk_size
+        self.chunk_overlap = chunk_overlap
+        self.llm_model = llm_model
+        self.data_dir = data_dir
+        self.topK = topK
+        self.instruction = instruction
 
-# Save FAISS index and metadata
-def save_faiss_index():
-    faiss.write_index(index, INDEX_FILE)
-    with open(METADATA_FILE, "w") as f:
-        json.dump(metadata, f, indent=4)
+        # FAISS Parameters
+        self.vector_dim = 768
+        self.index_file = "faiss_index.bin"
+        self.metadata_file = "faiss_metadata.json"
 
-# Generate embedding using Ollama
-def get_embedding(text: str, model: str = "nomic-embed-text") -> list:
-    response = ollama.embeddings(model=model, prompt=text)
-    return response["embedding"]
+        # Initialize FAISS index
+        self.index = faiss.IndexFlatL2(self.vector_dim)
+        
+        # Load index & metadata if available
+        self.metadata = self._load_metadata()
+        self._load_faiss_index()
 
-# Store embeddings in FAISS with explicit ID
-def store_embedding(file: str, page: int, chunk: str, embedding: list):
-    """Stores embeddings in FAISS with a unique key and metadata mapping"""
-    embedding_np = np.array([embedding], dtype=np.float32)
-    
-    key = f"{DOC_PREFIX}{file}_page_{page}_chunk_{len(metadata)}"
-    
-    # Assign a unique index
-    index_id = len(metadata)  
-    index.add(embedding_np)
-    
-    # Store metadata with the key
-    metadata[str(index_id)] = {
-        "file": file,
-        "page": page,
-        "chunk": chunk
-    }
-    
-    save_faiss_index()
-    #print(f"Stored embedding for: {file} (Page {page})")
+    def _load_metadata(self):
+        """Load stored metadata (text chunks and their sources)."""
+        if os.path.exists(self.metadata_file):
+            with open(self.metadata_file, "r") as f:
+                return json.load(f)
+        return {}
 
+    def _save_faiss_index(self):
+        """Save the FAISS index and metadata to disk."""
+        faiss.write_index(self.index, self.index_file)
+        with open(self.metadata_file, "w") as f:
+            json.dump(self.metadata, f, indent=4)
 
-def load_faiss_index():
-    """Load the FAISS index if it exists."""
-    global index
-    if os.path.exists(INDEX_FILE):
-        index = faiss.read_index(INDEX_FILE)
-        print("FAISS index loaded.")
-    else:
-        print("No FAISS index found")
+    def _load_faiss_index(self):
+        """Load the FAISS index from disk."""
+        if os.path.exists(self.index_file):
+            self.index = faiss.read_index(self.index_file)
+            print("FAISS index loaded.")
 
-def extract_text_from_pdf(pdf_path):
-    """Extract text from a PDF file."""
-    doc = fitz.open(pdf_path)
-    text_by_page = []
-    for page_num, page in enumerate(doc):
-        text_by_page.append((page_num, page.get_text()))
-    return text_by_page
+    def _get_embedding(self, text: str) -> list:
+        """Generate an embedding for a given text using Ollama."""
+        response = ollama.embeddings(model=self.embedding_model, prompt=text)
+        return response["embedding"]
 
-def split_text_into_chunks(text, chunk_size=300, overlap=50):
-    """Split text into overlapping chunks."""
-    words = text.split()
-    return [" ".join(words[i:i + chunk_size]) for i in range(0, len(words), chunk_size - overlap)]
+    def _extract_text_from_pdf(self, pdf_path):
+        """Extract text from a PDF file."""
+        doc = fitz.open(pdf_path)
+        text_by_page = []
+        for page_num, page in enumerate(doc):
+            text_by_page.append((page_num, page.get_text()))
+        return text_by_page
 
-def process_pdfs(data_dir):
-    """Process all PDFs in the directory and store their embeddings."""
-    for file_name in os.listdir(data_dir):
-        if file_name.endswith(".pdf"):
-            pdf_path = os.path.join(data_dir, file_name)
-            text_by_page = extract_text_from_pdf(pdf_path)
+    def _split_text_into_chunks(self, text):
+        """Split text into overlapping chunks."""
+        words = text.split()
+        return [" ".join(words[i:i + self.chunk_size]) for i in range(0, len(words), self.chunk_size - self.chunk_overlap)]
 
-            for page_num, text in text_by_page:
-                chunks = split_text_into_chunks(text, chunk_size=300, overlap=50)
-                for chunk in chunks:
-                    embedding = get_embedding(chunk)
-                    store_embedding(file_name, page_num, chunk, embedding)
-            
-            print(f"Processed {file_name}")
+    def store_embedding(self, file: str, page: int, chunk: str):
+        """Stores an embedding in FAISS with a unique ID and metadata mapping."""
+        embedding = self._get_embedding(chunk)
+        embedding_np = np.array([embedding], dtype=np.float32)
 
+        # Assign a unique index
+        index_id = len(self.metadata)  
+        self.index.add(embedding_np)
 
-def query_faiss(query_text: str, top_k=3):
-    """Perform nearest neighbor search in FAISS."""
-    query_embedding = np.array([get_embedding(query_text)], dtype=np.float32)
-    distances, indices = index.search(query_embedding, top_k)
+        # Store metadata
+        self.metadata[str(index_id)] = {
+            "file": file,
+            "page": page,
+            "chunk": chunk
+        }
 
-    print("\n🔍 Search Results:")
-    for i in range(top_k):
-        print(f"Result {i+1}: Distance {distances[0][i]:.4f}")
+        self._save_faiss_index()
 
+    def process_pdfs(self):
+        """Process all PDFs in the directory and store their embeddings."""
+        for file_name in os.listdir(self.data_dir):
+            if file_name.endswith(".pdf"):
+                pdf_path = os.path.join(self.data_dir, file_name)
+                text_by_page = self._extract_text_from_pdf(pdf_path)
 
+                for page_num, text in text_by_page:
+                    chunks = self._split_text_into_chunks(text)
+                    for chunk in chunks:
+                        self.store_embedding(file_name, page_num, chunk)
+                
+                print(f"Processed {file_name}")
 
-# FAISS Parameters
-VECTOR_DIM = 768
-INDEX_FILE = "faiss_index.bin"
-METADATA_FILE = "faiss_metadata.json"  # Store chunk metadata
+    def search_embeddings(self, query):
+        """Search FAISS and return relevant text chunks."""
+        query_embedding = np.array([self._get_embedding(query)], dtype=np.float32)
+        distances, indices = self.index.search(query_embedding, self.topK)
 
-# Load FAISS index
-def load_faiss_index():
-    """Load the FAISS index if it exists."""
-    global index
-    if os.path.exists(INDEX_FILE):
-        index = faiss.read_index(INDEX_FILE)
-        print("FAISS index loaded.")
-    else:
-        print("No FAISS index found.")
-        index = faiss.IndexFlatL2(VECTOR_DIM)
-    return index
+        results = []
+        for i in range(self.topK):
+            idx = int(indices[0][i])
+            if str(idx) in self.metadata:  # Ensure metadata exists
+                results.append({
+                    "file": self.metadata[str(idx)]["file"],
+                    "page": self.metadata[str(idx)]["page"],
+                    "chunk": self.metadata[str(idx)]["chunk"],
+                    "similarity": distances[0][i]
+                })
 
-# Load Metadata (Chunk Texts & File Info)
-def load_metadata():
-    """Load stored metadata (text chunks and their sources)."""
-    if os.path.exists(METADATA_FILE):
-        with open(METADATA_FILE, "r") as f:
-            return json.load(f)
-    return {}
+        return results
 
-# Search FAISS for similar embeddings
-def search_embeddings(query, top_k=3):
-    """Search FAISS and return relevant text chunks."""
-    index = load_faiss_index()
-    metadata = load_metadata()
+    def generate_rag_response(self, query):
+        """Generate a response using retrieved text chunks as context."""
+        context_results = self.search_embeddings(query)
 
-    query_embedding = np.array([get_embedding(query)], dtype=np.float32)
+        context_str = "\n\n".join([
+            f"From {result['file']} (page {result['page']}):\n"
+            f"{result['chunk']}\n"
+            f"(Similarity: {float(result['similarity']):.4f})"
+            for result in context_results
+        ])
 
-    distances, indices = index.search(query_embedding, top_k)
+        print(f"Context:\n{context_str}")
 
-    results = []
-    for i in range(top_k):
-        idx = int(indices[0][i])
-        if str(idx) in metadata:  # Ensure metadata exists
-            results.append({
-                "file": metadata[str(idx)]["file"],
-                "page": metadata[str(idx)]["page"],
-                "chunk": metadata[str(idx)]["chunk"],
-                "similarity": distances[0][i]
-            })
+        # Construct prompt with retrieved context
+        prompt = f"""You are a helpful AI assistant. 
+        Use the following context to answer the query as accurately as possible. If the context is 
+        not relevant to the query, say 'I don't know'.
 
-    return results
+    Context:
+    {context_str}
 
-# Generate RAG Response
-def generate_rag_response(query, context_results):
-    """Generate a response using retrieved text chunks as context."""
+    Query: {query}
 
-    context_str = "\n\n".join([
-        f"From {result['file']} (page {result['page']}):\n"
-        f"{result['chunk']}\n"
-        f"(Similarity: {float(result['similarity']):.4f})"
-        for result in context_results
-    ])
+    Answer:"""
 
-    print(f"context:\n{context_str}")
+        # Generate response using Ollama
+        response = ollama.chat(
+            model=self.llm_model, messages=[{"role": "user", "content": prompt}]
+        )
 
-    # Construct prompt with retrieved context
-    prompt = f"""You are a helpful AI assistant. 
-    Use the following context to answer the query as accurately as possible. If the context is 
-    not relevant to the query, say 'I don't know'.
+        return response["message"]["content"]
 
-Context:
-{context_str}
+    def interactive_search(self):
+        """Interactive search interface."""
+        print("🔍 FAISS RAG Search Interface")
+        print("Type 'exit' to quit")
 
-Query: {query}
+        while True:
+            query = input("\nEnter your search query: ")
 
-Answer:"""
+            if query.lower() == "exit":
+                break
 
-    # Generate response using Ollama
-    response = ollama.chat(
-        model="llama3.2:latest", messages=[{"role": "user", "content": prompt}]
-    )
+            response = self.generate_rag_response(query)
 
-    return response["message"]["content"]
+            print("\n--- Response ---")
+            print(response)
 
-
-def interactive_search():
-    """Interactive search interface."""
-    print("🔍 FAISS RAG Search Interface")
-    print("Type 'exit' to quit")
-
-    while True:
-        query = input("\nEnter your search query: ")
-
-        if query.lower() == "exit":
-            break
-
-        context_results = search_embeddings(query)
-
-        response = generate_rag_response(query, context_results)
-
-        print("\n--- Response ---")
-        print(response)
 
 if __name__ == "__main__":
-    process_pdfs("data")  
-    interactive_search()
-
+    faiss_rag = FaissRAG(data_dir="data")
+    faiss_rag.process_pdfs()
+    faiss_rag.interactive_search()
