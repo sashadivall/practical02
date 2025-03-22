@@ -4,22 +4,24 @@ import numpy as np
 import os
 import json
 import fitz  # PyMuPDF for PDF extraction
-
+from sentence_transformers import SentenceTransformer
 
 class FaissRAG:
-    def __init__(self, embedding_model: str = "nomic-embed-text", chunk_size: int = 300, chunk_overlap: int = 50, 
-                 llm_model: str = "llama3.2:latest", data_dir: str = "data", topK: int = 3, instruction: str = None):
+    def __init__(self, embedding_model: str = "all-MiniLM-L6-v2", embedding_type: str = 'sentence_transformer', chunk_size: int = 300, chunk_overlap: int = 50, 
+                 llm_model: str = "llama3.2:latest", data_dir: str = "data", topK: int = 3, instruction: str = None, llm:str = 'llama3.2:latest'):
 
         self.embedding_model = embedding_model
+        self.embedding_type = embedding_type
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.llm_model = llm_model
         self.data_dir = data_dir
         self.topK = topK
         self.instruction = instruction
+        self.llm=llm
 
         # FAISS Parameters
-        self.vector_dim = 768
+        self.vector_dim = 384
         self.index_file = "faiss_index.bin"
         self.metadata_file = "faiss_metadata.json"
 
@@ -50,9 +52,18 @@ class FaissRAG:
             print("FAISS index loaded.")
 
     def _get_embedding(self, text: str) -> list:
-        """Generate an embedding for a given text using Ollama."""
-        response = ollama.embeddings(model=self.embedding_model, prompt=text)
-        return response["embedding"]
+        """Generate an embedding based on the selected embedding model."""
+        if isinstance(self.embedding_model, str):  # Using Ollama
+            response = ollama.embeddings(model=self.embedding_model, prompt=text)
+            embedding = response["embedding"]
+        elif isinstance(self.embedding_model, SentenceTransformer):  # Using SentenceTransformer
+            embedding = self.embedding_model.encode(text).tolist()
+        else:
+            raise ValueError(f"Unsupported embedding model type: {type(self.embedding_model)}")
+
+    
+        return embedding
+
 
     def _extract_text_from_pdf(self, pdf_path):
         """Extract text from a PDF file."""
@@ -148,6 +159,14 @@ class FaissRAG:
         )
 
         return response["message"]["content"]
+    def ingest(self):
+        self.process_pdfs()
+    def static_search(self, query):
+        context_results = self.search_embeddings(query)
+
+        # Generate RAG response
+        response = self.generate_rag_response(query)
+        return response
 
     def interactive_search(self):
         """Interactive search interface."""

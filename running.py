@@ -86,7 +86,7 @@ def main():
     embedding_model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
 
     # TODO - change depending on the transformer you use
-    embedding_model_name = 'hkunlp/instructor-xl'
+    embedding_model_name = 'all-MiniLM-L6-v2'
     
     #embedding_models = [
     #    SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2'),
