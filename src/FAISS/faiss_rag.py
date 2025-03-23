@@ -7,10 +7,10 @@ import fitz  # PyMuPDF for PDF extraction
 from sentence_transformers import SentenceTransformer
 
 class FaissRAG:
-    def __init__(self, embedding_model: str = "all-MiniLM-L6-v2", embedding_type: str = 'sentence_transformer', chunk_size: int = 300, chunk_overlap: int = 50, 
-                 llm_model: str = "llama3.2:latest", data_dir: str = "data", topK: int = 3, instruction: str = None, llm:str = 'llama3.2:latest'):
+    def __init__(self, embedding_model: str = "all-MiniLM-L6-v2", embedding_type: str = 'sentence_transformer', chunk_size: int = 500, chunk_overlap: int = 100, 
+                 llm_model: str = "mistral:latest", data_dir: str = "data", topK: int = 3, instruction: str = None, llm:str = 'mistral:latest'):
 
-        self.embedding_model = embedding_model
+        self.embedding_model = SentenceTransformer(embedding_model)
         self.embedding_type = embedding_type
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
@@ -52,18 +52,8 @@ class FaissRAG:
             print("FAISS index loaded.")
 
     def _get_embedding(self, text: str) -> list:
-        """Generate an embedding based on the selected embedding model."""
-        if isinstance(self.embedding_model, str):  # Using Ollama
-            response = ollama.embeddings(model=self.embedding_model, prompt=text)
-            embedding = response["embedding"]
-        elif isinstance(self.embedding_model, SentenceTransformer):  # Using SentenceTransformer
-            embedding = self.embedding_model.encode(text).tolist()
-        else:
-            raise ValueError(f"Unsupported embedding model type: {type(self.embedding_model)}")
-
-    
-        return embedding
-
+        """Generate an embedding using SentenceTransformer."""
+        return self.embedding_model.encode(text).tolist()
 
     def _extract_text_from_pdf(self, pdf_path):
         """Extract text from a PDF file."""
