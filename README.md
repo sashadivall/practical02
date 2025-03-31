@@ -1,7 +1,13 @@
-Docs to Add:
- - Professor questions from class
- - Written description on how to build B+ / AVL Trees
- - How-To Mongo + Redis Queries
+# How to Use Our Program
+Welcome to our Practical 2 Project! You will run our program through the `use_rag.py` file. There are a few arguments you can pass to customize your RAG experience.
+- `--data_dir`: The directory containing your class notes.
+- `--vectordb`: The vectorDB you would like to use. Must be one of 'redis', 'chroma', or 'faiss'
+- `--port`: If you're using redis and the port on which your instance is hosted is NOT 6379, pass in your port here.
+- `--embedding`: The name of the embedding model you want to use. Must be one of 'all-MiniLM-L6-v2', 'all-mpnet-base-v2', 'hkunlp/instructor-xl', 'nomic-embed-text'
+- `--chunk_size`: The size of each chunk in each embedding vector.
+- `--chunk_overlap`: The number of characters that chunks overlap.
+- `--llm`: The llm you would like to use for generating your responses. Must be one of 'llama3.2:latest', 'mistral:latest'.
+
 
 # Practical 2: VectorDBs and LLMs
 DS4300 Spring 2025 Practical 2
